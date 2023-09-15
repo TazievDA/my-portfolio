@@ -1,6 +1,4 @@
-# Taziev Denis
-
-<img alt="Photo" height="267" src="https://sun131-1.userapi.com/impf/c855232/v855232947/113fb1/2uRACu-EQ7A.jpg?size=1620x2160&amp;quality=96&amp;sign=6a4c7acc988a78a3c49120585fec2cd8&amp;type=album" width="200"/>
+<img alt="Photo" height="267" src="iamge.jpg" width="200" style="display: inline-block; border-radius: 100%; overflow: hidden;height: 100px; width: 100px"/>
 
 ### Hey, everybody!
 

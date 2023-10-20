@@ -5,9 +5,10 @@
 
 ### Hey, everybody!
 
-This is my first portfolio page. I would like to tell you a little about myself.
+This is my portfolio page. I would like to tell you a little about myself.
 
 - I live in the city of **Tyumen**, but ready to work in any time zone.
 - My main education is a bachelor's degree in **conflict resolution**.
 - Though I am a humanitarian, but still work in IT direction.
 - I am currently studying **Python**.
+- In the "Actual used scripts" folder are the scripts that are used in my current work almost every day.

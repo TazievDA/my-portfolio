@@ -154,6 +154,8 @@ def get_user_info(users_id):
 
 
 def get_region(city):
+    if '-' in city:
+        city = ' '.join(city.split('-'))
     params = {'q': city}
     url = 'https://leader-id.ru/api/v4/cities/search'
     response = requests.get(url, params=params)

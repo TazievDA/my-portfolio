@@ -45,7 +45,7 @@ def print_banner():
     ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒
 
    Leader-ID Support Team.
-   Выгрузка информации о мероприятиях.
+   Утилита для выгрузок.
     """
 
     print(Fore.CYAN + banner + Style.RESET_ALL)
@@ -88,6 +88,105 @@ def get_theme_name(theme):
         return data['data']['name']
     except KeyError:
         return f'{theme}'
+
+
+def get_owner_token(org_id):
+    api_key = get_api_key()
+    api_url = 'https://leader-id.ru/api/v4/admin/users/auth'
+    headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+    data = json.dumps({
+        'userId': org_id
+    })
+
+    token_response = requests.post(api_url, headers=headers, data=data)
+    token = token_response.json()['data']['token']
+    return token
+
+
+def get_orgs_events(orgs_id):
+    events_list = []
+    for org_id in orgs_id:
+        token = get_owner_token(org_id)
+        api_url = 'https://leader-id.ru/api/v4/owner/events'
+        headers = {'Authorization': f'Bearer {token}'}
+        params = {'fields': 'id', 'paginationSize': '1000'}
+        response = requests.get(api_url, headers=headers, params=params)
+        events_id = response.json()['data']['_items']
+        for event in events_id:
+            events_list.append(str(event['id']))
+    return events_list
+
+
+def get_users_events(userId):
+    api_key = get_api_key()
+    params = {'userId': userId, 'paginationSize': '1000'}
+    headers = {'Authorization': f'Bearer {api_key}'}
+    api_url = 'https://leader-id.ru/api/v4/admin/event-participants/history'
+    response = requests.get(api_url, params=params, headers=headers)
+    data = response.json()['data']['_items']
+    events_list = []
+    for event in data:
+        events_list.append(event['event']['id'])
+    return events_list
+
+
+def search_companys_events(company_id):
+    api_url = f'https://leader-id.ru/api/v4/events/search'
+    params = {'organizationId': company_id, 'paginationSize': 999}
+    response = requests.get(api_url, params=params)
+    data = response.json().get('data', {}).get('_items', {})
+    events_id = []
+    for event in data:
+        events_id.append(event.get('id', ''))
+    return events_id
+
+
+def get_user_info(users_id):
+    token = get_api_key()
+    data = []
+    headers = {'Authorization': f'Bearer {token}'}
+    for user in users_id:
+        url = f'https://leader-id.ru/api/v4/admin/users/{user}'
+        response = requests.get(url, headers=headers)
+        lst = response.json().get('data', {})
+        data.append(lst)
+    return data
+
+
+def get_region(city):
+    params = {'q': city}
+    url = 'https://leader-id.ru/api/v4/cities/search'
+    response = requests.get(url, params=params)
+    region = response.json().get('data', {})[0].get('region', {})
+    return region
+
+
+def save_user_info(function, users_id):
+    data = get_user_info(users_id)
+    date = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
+
+    writer = pd.ExcelWriter(f'{function} {date}.xlsx', engine='xlsxwriter')
+
+    workbook = writer.book
+
+    all_data = pd.DataFrame()
+
+    for user in data:
+        city = user.get('address', {})
+        region = get_region(city)
+        print(f'Формирую выгрузку для пользователя "{user["name"]}"')
+        export = pd.DataFrame({'ФИО': user.get('name', {}), 'Дата рождения': user.get('birthday', {}),
+                               'Электронная почта': user.get('email', {}), 'Номер телефона': user.get('phone', {}),
+                               'Место работы': user.get('employment', {}).get('company', {}),
+                               'Должность': user.get('employment', {}).get('position', {}),
+                               'Роль': user.get('roleName', {}),
+                               'Город проживания': city, 'Регион': region, 'Статус': user.get('status', {})},
+                              index=[user['id']])
+        all_data = pd.concat([all_data, export])
+
+    all_data.to_excel(writer, sheet_name='Sheet1', index=True, header=True)
+
+    workbook.close()
 
 
 def save_json_to_excel(function, eventsId):
@@ -186,62 +285,9 @@ def save_json_to_excel(function, eventsId):
 
         all_data = pd.concat([all_data, export])
 
-    # Записываем данные в текущий лист
     all_data.to_excel(writer, sheet_name='Sheet1', index=True, header=True)
 
-    # Закрываем объект Workbook
     workbook.close()
-
-
-def get_owner_token(org_id):
-    api_key = get_api_key()
-    api_url = 'https://leader-id.ru/api/v4/admin/users/auth'
-    headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
-    data = json.dumps({
-        'userId': org_id
-    })
-
-    token_response = requests.post(api_url, headers=headers, data=data)
-    token = token_response.json()['data']['token']
-    return token
-
-
-def get_orgs_events(orgs_id):
-    events_list = []
-    for org_id in orgs_id:
-        token = get_owner_token(org_id)
-        api_url = 'https://leader-id.ru/api/v4/owner/events'
-        headers = {'Authorization': f'Bearer {token}'}
-        params = {'fields': 'id', 'paginationSize': '1000'}
-        response = requests.get(api_url, headers=headers, params=params)
-        events_id = response.json()['data']['_items']
-        for event in events_id:
-            events_list.append(str(event['id']))
-    return events_list
-
-
-def get_users_events(userId):
-    api_key = get_api_key()
-    params = {'userId': userId, 'paginationSize': '1000'}
-    headers = {'Authorization': f'Bearer {api_key}'}
-    api_url = 'https://leader-id.ru/api/v4/admin/event-participants/history'
-    response = requests.get(api_url, params=params, headers=headers)
-    data = response.json()['data']['_items']
-    events_list = []
-    for event in data:
-        events_list.append(event['event']['id'])
-    return events_list
-
-
-def search_companys_events(company_id):
-    api_url = f'https://leader-id.ru/api/v4/events/search'
-    params = {'organizationId': company_id, 'paginationSize': 999}
-    response = requests.get(api_url, params=params)
-    data = response.json().get('data', {}).get('_items', {})
-    events_id = []
-    for event in data:
-        events_id.append(event.get('id', ''))
-    return events_id
 
 
 def main():
@@ -251,44 +297,54 @@ def main():
             function_choice = input('Что будем делать? :)\n1 — получить информацию по ID мероприятий\n'
                                     '2 — получить список мероприятий по ID организатора(-ов)\n'
                                     '3 — список участий пользователя в мероприятиях\n'
-                                    '4 — список мероприятий организации\n')
+                                    '4 — список мероприятий организации\n'
+                                    '5 — получить данные профиля\n')
             if function_choice == '1':
                 function_name = 'events info'
                 events = input('Введите ID мероприятий через запятую: ').split(', ')
-                save_json_to_excel(function_name, events)
+                save_json_to_excel(function=function_name, eventsId=events)
                 print(Fore.GREEN + 'Файл сохранён в корневую папку')
 
             elif function_choice == '2':
-                orgs_id = input('Введите ID организаторов через запятую: ').split(', ')
-                if len(orgs_id) > 1:
+                orgs_id_ = input('Введите ID организаторов через запятую: ').split(', ')
+                if len(orgs_id_) > 1:
                     function_name = f'organizers events'
                 else:
-                    function_name = f'organizer {orgs_id[0]} events'
-                org_events = get_orgs_events(orgs_id)
+                    function_name = f'organizer {orgs_id_[0]} events'
+                org_events = get_orgs_events(orgs_id=orgs_id_)
                 if not org_events:
                     print('У пользователя нет созданных мероприятий.')
                 else:
-                    save_json_to_excel(function_name, org_events)
+                    save_json_to_excel(function=function_name, eventsId=org_events)
                     print(Fore.GREEN + 'Файл сохранён в корневую папку')
 
             elif function_choice == '3':
                 user_id = int(input('Введите ID пользователя: '))
                 function_name = f'user {user_id} participation'
-                user_events = get_users_events(user_id)
+                user_events = get_users_events(userId=user_id)
                 if not user_events:
                     print('У пользователя нет посещённых мероприятий.')
                 else:
-                    save_json_to_excel(function_name, user_events)
+                    save_json_to_excel(function=function_name, eventsId=user_events)
                     print(Fore.GREEN + 'Файл сохранён в корневую папку')
             elif function_choice == '4':
-                company_id = int(input('Введите ID организации: '))
-                function_name = f'company {company_id} events'
-                company_events = search_companys_events(company_id)
+                company_id_ = int(input('Введите ID организации: '))
+                function_name = f'company {company_id_} events'
+                company_events = search_companys_events(company_id=company_id_)
                 if not company_events:
                     print('У организации нет мероприятий.')
                 else:
-                    save_json_to_excel(function_name, company_events)
+                    save_json_to_excel(function=function_name, eventsId=company_events)
                     print(Fore.GREEN + 'Файл сохранён в корневую папку')
+            elif function_choice == '5':
+                ids = input('Введите ID пользователей через запятую: ').split(', ')
+                if len(ids) > 1:
+                    function_name = 'users info'
+                else:
+                    function_name = f'user {ids[0]} info'
+                save_user_info(function=function_name, users_id=ids)
+                print(Fore.GREEN + 'Файл сохранён в корневую папку')
+
         except Exception:
             print(Fore.RED + 'Ошибка.')
 

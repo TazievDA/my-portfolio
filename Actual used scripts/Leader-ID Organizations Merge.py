@@ -71,7 +71,6 @@ def main():
 
     api_key = get_api_key()
 
-    # Замените эту переменную своим значением API URL.
     api_url = 'https://admin.leader-id.ru/api/v4/admin/organizations'
 
     while True:

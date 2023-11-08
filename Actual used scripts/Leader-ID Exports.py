@@ -41,6 +41,7 @@ def print_banner():
 
     print(Fore.CYAN + banner + Style.RESET_ALL)
 
+
 class Auth:
     @staticmethod
     def get_api_key() -> object:
@@ -334,7 +335,6 @@ def main():
         if function_choice == '1':
             function_name = 'events info'
             events = input('Введите ID мероприятий через запятую: ').split(', ')
-            getting_info = GetInfo()
             saving_event_info = SavingEventInfo(function_name, events)
             saving_event_info.save_json_to_excel(function_name, events)
             print(Fore.GREEN + 'Файл сохранён в корневую папку')

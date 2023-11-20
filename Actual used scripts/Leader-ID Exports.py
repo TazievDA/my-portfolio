@@ -15,6 +15,64 @@ from email.header import Header
 just_fix_windows_console()
 
 
+class Auth:
+    @staticmethod
+    def pre_auth(token):
+        headers = {'Authorization': f'Bearer {token}'}
+        params = {'id': 292338}
+        url = 'https://leader-id.ru/api/v4/admin/users'
+        response = requests.get(url, params=params, headers=headers)
+        return response.status_code
+
+    @staticmethod
+    def send_success_email(name, token, ip):
+        smtpObj = smtplib.SMTP('smtp.gmail.com', 587)
+        smtpObj.starttls()
+        smtpObj.login('xxxx@xxxx.com', 'password')
+        message = MIMEText(f'IP: {ip} {name} с токеном {token} только что запросил выгрузку данных пользователей через '
+                           f'Leader-ID Export.\nСтатус: успешно.', 'plain', 'utf-8')
+        message['Subject'] = Header('Выгрузка контактных данных', 'utf-8')
+        smtpObj.sendmail('xxxx@xxxx.com', 'xxxx@xxxx.com', message.as_string())
+
+    @staticmethod
+    def send_failed_email(name, token, ip):
+        smtpObj = smtplib.SMTP('smtp.gmail.com', 587)
+        smtpObj.starttls()
+        smtpObj.login('xxxx@xxxx.com', 'password')
+        message = MIMEText(f'IP: {ip} {name} с токеном {token} только что запросил выгрузку данных пользователей через '
+                           f'Leader-ID Export.\nСтатус: ошибка, неверный bearer.', 'plain', 'utf-8')
+        message['Subject'] = Header('Выгрузка контактных данных', 'utf-8')
+        smtpObj.sendmail('xxxx@xxxx.com', 'xxxx@xxxx.com', message.as_string())
+
+    def get_ip(self):
+        conn = http.client.HTTPConnection("ifconfig.me")
+        conn.request("GET", "/ip")
+        return conn.getresponse().read()
+
+    @staticmethod
+    def get_api_key() -> object:
+        api_url = 'https://leader-id.ru/api/v4/auth/refresh-token'
+        data = {
+            'refreshToken': 'refresh_token'
+        }
+        refresh_response = requests.post(api_url, json=data)
+        api_key = refresh_response.json()['data']['access_token']
+        return api_key
+
+    @staticmethod
+    def get_owner_token(org_id):
+        api_key = Auth.get_api_key()
+        api_url = 'https://leader-id.ru/api/v4/admin/users/auth'
+        headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+        data = json.dumps({
+            'userId': org_id
+        })
+
+        token_response = requests.post(api_url, headers=headers, data=data)
+        token = token_response.json()['data']['token']
+        return token
+
+
 def print_banner():
     banner = r"""
 
@@ -44,55 +102,6 @@ def print_banner():
     """
 
     print(Fore.CYAN + banner + Style.RESET_ALL)
-
-
-class Auth:
-    @staticmethod
-    def pre_auth(token):
-        headers = {'Authorization': f'Bearer {token}'}
-        params = {'id': 292338}
-        url = 'https://leader-id.ru/api/v4/admin/users'
-        response = requests.get(url, params=params, headers=headers)
-        return response.status_code
-
-    @staticmethod
-    def send_email(name, token, ip):
-        smtpObj = smtplib.SMTP('smtp.gmail.com', 587)
-        smtpObj.starttls()
-        smtpObj.login('xxxxx@xxxx.com', 'password')
-        message = MIMEText(f'IP: {ip} {name} с токеном {token} только что запросил выгрузку данных пользователей через '
-                           f'Leader-ID Export.', 'plain', 'utf-8')
-        message['Subject'] = Header('Выгрузка контактных данных', 'utf-8')
-        smtpObj.sendmail('from_email@xxxx.com', 'to_email@xxxx.com', message.as_string())
-
-    @staticmethod
-    def get_ip():
-        conn = http.client.HTTPConnection("ifconfig.me")
-        conn.request("GET", "/ip")
-        return conn.getresponse().read()
-
-    @staticmethod
-    def get_api_key() -> object:
-        api_url = 'https://leader-id.ru/api/v4/auth/refresh-token'
-        data = {
-            'refreshToken': 'refresh_token'
-        }
-        refresh_response = requests.post(api_url, json=data)
-        api_key = refresh_response.json()['data']['access_token']
-        return api_key
-
-    @staticmethod
-    def get_owner_token(org_id):
-        api_key = Auth.get_api_key()
-        api_url = 'https://leader-id.ru/api/v4/admin/users/auth'
-        headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
-        data = json.dumps({
-            'userId': org_id
-        })
-
-        token_response = requests.post(api_url, headers=headers, data=data)
-        token = token_response.json()['data']['token']
-        return token
 
 
 class GetInfo:
@@ -185,7 +194,7 @@ class GetInfo:
             lst = response.json().get('data', {})
             print(f'Получаю информацию о пользователе {lst.get("name", {})}')
             data.append(lst)
-            sleep(0.2)
+            sleep(0.5)
         return data
 
     @staticmethod
@@ -197,6 +206,22 @@ class GetInfo:
         response = requests.get(url, params=params)
         region = response.json().get('data', {})[0].get('region', {})
         return region
+
+    @staticmethod
+    def get_participants(events_id):
+        token = Auth.get_api_key()
+        headers = {'Authorization': f'Bearer {token}'}
+        url = 'https://leader-id.ru/api/v4/admin/event-participants/search'
+        users_id = []
+        for event in events_id:
+            params = {'eventId': event}
+            response = requests.get(url, headers=headers, params=params)
+            data = response.json().get('data', {}).get('_items', {})
+            users = []
+            for user in data:
+                users.append(f'{user["user_id"]}')
+            users_id.append(users)
+        return zip(events_id, users_id)
 
 
 class SavingEventInfo:
@@ -262,6 +287,7 @@ class SavingEventInfo:
             for theme in event_themes:
                 theme_name = GetInfo.get_theme_name(theme)
                 themes.append(theme_name)
+                sleep(0.2)
 
             participation_format = ''
             if event['participationFormat'] == 'person':
@@ -305,7 +331,7 @@ class SavingEventInfo:
         workbook.close()
 
 
-class SavingUsersInfo:
+class SavingUsersInfo():
     def __init__(self, function, usersId):
         self.function = function
         self.usersId = usersId
@@ -327,8 +353,7 @@ class SavingUsersInfo:
                 # if user.get('employment')
                 print(f'Формирую выгрузку для пользователя "{user["name"]}"')
                 export = pd.DataFrame({'ФИО': user.get('name', {}), 'Дата рождения': user.get('birthday', {}),
-                                       'Электронная почта': user.get('email', {}),
-                                       'Номер телефона': user.get('phone', {}),
+                                       'Электронная почта': user.get('email', {}), 'Номер телефона': user.get('phone', {}),
                                        'Место работы': user.get('employment', {}).get('company', None),
                                        'Должность': user.get('employment', {}).get('position', None),
                                        'Роль': user.get('roleName', {}),
@@ -350,6 +375,42 @@ class SavingUsersInfo:
 
         workbook.close()
 
+    def save_participants_info(self, function, datas):
+        date = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
+        all_data = pd.DataFrame()
+        writer = pd.ExcelWriter(f'{function} {date}.xlsx', engine='xlsxwriter')
+        workbook = writer.book
+
+        for event, users_id in datas:
+            data = GetInfo.get_user_info(users_id)
+            for user in data:
+                try:
+                    city = user.get('address', {})
+                    region = GetInfo.get_region(city)
+                    print(f'Формирую выгрузку для пользователя "{user["name"]}"')
+                    export = pd.DataFrame({'ID': user['id'], 'ФИО': user.get('name', {}), 'Дата рождения': user.get('birthday', {}),
+                                           'Электронная почта': user.get('email', {}), 'Номер телефона': user.get('phone', {}),
+                                           'Место работы': user.get('employment', {}).get('company', None),
+                                           'Должность': user.get('employment', {}).get('position', None),
+                                           'Роль': user.get('roleName', {}),
+                                           'Город проживания': city, 'Регион': region, 'Статус': user.get('status', {})},
+                                          index=[event])
+                    all_data = pd.concat([all_data, export])
+                except Exception:
+                    export = pd.DataFrame({'ID': user['id'], 'ФИО': '', 'Дата рождения': '',
+                                           'Электронная почта': '', 'Номер телефона': '',
+                                           'Место работы': '',
+                                           'Должность': '',
+                                           'Роль': '',
+                                           'Город проживания': '', 'Регион': '', 'Статус': ''},
+                                          index=[event])
+                    all_data = pd.concat([all_data, export])
+                    continue
+
+        all_data.to_excel(writer, sheet_name='Sheet1', index=True, header=True)
+
+        workbook.close()
+
 
 def main():
     print_banner()
@@ -359,7 +420,8 @@ def main():
                                     '2 — получить список мероприятий по ID организатора(-ов)\n'
                                     '3 — список участий пользователя в мероприятиях\n'
                                     '4 — список мероприятий организации\n'
-                                    '5 — получить данные профиля\n')
+                                    '5 — получить данные профиля\n'
+                                    '6 — получить данные участников мероприятия(-ий)\n')
             if function_choice == '1':
                 function_name = 'events info'
                 events = input('Введите ID мероприятий через запятую: ').split(', ')
@@ -412,14 +474,14 @@ def main():
                 if authorization.pre_auth(token) != 200:
                     print('У вас нет прав для совершения этого действия.')
                     ip = authorization.get_ip()
-                    authorization.send_email(name, token, ip)
+                    authorization.send_failed_email(name, token, ip)
                     break
                 else:
                     print()
                     print('Авторизация прошла успешно. Продолжаем выгружать информацию.')
                     print()
                     ip = authorization.get_ip()
-                    authorization.send_email(name, token, ip)
+                    authorization.send_success_email(name, token, ip)
                 ids = input('Введите ID пользователей через запятую: ').split(', ')
                 if len(ids) > 1:
                     function_name = 'users info'
@@ -428,6 +490,30 @@ def main():
                 saving_users_info = SavingUsersInfo(function_name, ids)
                 saving_users_info.save_user_info(function_name, ids)
                 print(Fore.GREEN + 'Файл сохранён в корневую папку')
+            elif function_choice == '6':
+                authorization = Auth()
+                name = input(
+                    'Сейчас вы пытаетесь получить персональные данные пользователей. Пожалуйста, введите ваше ФИО: ')
+                print()
+                token = input('Введите ваш Bearer токен: ')
+                if authorization.pre_auth(token) != 200:
+                    print('У вас нет прав для совершения этого действия.')
+                    ip = authorization.get_ip()
+                    authorization.send_failed_email(name, token, ip)
+                    break
+                else:
+                    print()
+                    print('Авторизация прошла успешно. Продолжаем выгружать информацию.')
+                    print()
+                    ip = authorization.get_ip()
+                    authorization.send_success_email(name, token, ip)
+                function_name = 'participants export'
+                getting_info = GetInfo()
+                events_id = input('Введите ID мероприятий через запятую: ').split(', ')
+                data = getting_info.get_participants(events_id)
+                saving_users_info = SavingUsersInfo(function_name, data)
+                saving_users_info.save_participants_info(function_name, data)
+
 
         except Exception:
             print(Fore.RED + 'Ошибка.')

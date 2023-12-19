@@ -107,6 +107,38 @@ def print_banner():
 class GetInfo:
 
     @staticmethod
+    def search_events(event_name, date_start, date_end, place, moderation):
+        token = Auth.get_api_key()
+        url = 'https://admin.leader-id.ru/api/v4/admin/events/search'
+        headers = {'Authorization': f'Bearer {token}'}
+        params = {'paginationSize': 1000}
+        if event_name != '':
+            q = {'query': event_name}
+            params.update(q)
+        if date_start != '':
+            date_from = {'dateFrom': date_start}
+            params.update(date_from)
+        if date_end != '':
+            date_to = {'dateTo': date_end}
+            params.update(date_to)
+        if place != '':
+            location = {'location': place}
+            params.update(location)
+        if moderation != '':
+            mod = {'moderation': moderation}
+            params.update(mod)
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            data = response.json().get('data', {}).get('_items', {})
+            events_id = []
+            for event in data:
+                id = str(event.get('id'))
+                events_id.append(id)
+            return events_id
+        except Exception:
+            print('Мероприятия не найдены.')
+
+    @staticmethod
     def get_event_info(eventsId):
         token = Auth.get_api_key()
         headers = {'Authorization': f'Bearer {token}'}
@@ -229,7 +261,7 @@ class SavingEventInfo:
         self.function = function
         self.eventsId = eventsId
 
-    def save_json_to_excel(self, function, eventsId):
+    def save_event_info(self, function, eventsId):
         data = GetInfo.get_event_info(eventsId)
         date = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
 
@@ -277,10 +309,12 @@ class SavingEventInfo:
                 org_name = event['organizer']['name']
                 org_phone = event['organizer']['phone']
                 org_email = event['organizer']['email']
+                org_company = event['organizer']['company']['name']
             except Exception:
                 org_name = ''
                 org_phone = ''
                 org_email = ''
+                org_company = ''
 
             themes = []
             event_themes = event['themes']
@@ -318,6 +352,7 @@ class SavingEventInfo:
                                    'ФИО организатора': org_name,
                                    'Номер телефона организатора': org_phone,
                                    'Электронная почта организатора': org_email,
+                                   'Организация': org_company,
                                    'Статус модерации': moderation,
                                    'Статус публикации': event['status'],
                                    'Темы': ', '.join(themes),
@@ -353,7 +388,8 @@ class SavingUsersInfo():
                 # if user.get('employment')
                 print(f'Формирую выгрузку для пользователя "{user["name"]}"')
                 export = pd.DataFrame({'ФИО': user.get('name', {}), 'Дата рождения': user.get('birthday', {}),
-                                       'Электронная почта': user.get('email', {}), 'Номер телефона': user.get('phone', {}),
+                                       'Электронная почта': user.get('email', {}),
+                                       'Номер телефона': user.get('phone', {}),
                                        'Место работы': user.get('employment', {}).get('company', None),
                                        'Должность': user.get('employment', {}).get('position', None),
                                        'Роль': user.get('roleName', {}),
@@ -388,12 +424,15 @@ class SavingUsersInfo():
                     city = user.get('address', {})
                     region = GetInfo.get_region(city)
                     print(f'Формирую выгрузку для пользователя "{user["name"]}"')
-                    export = pd.DataFrame({'ID': user['id'], 'ФИО': user.get('name', {}), 'Дата рождения': user.get('birthday', {}),
-                                           'Электронная почта': user.get('email', {}), 'Номер телефона': user.get('phone', {}),
+                    export = pd.DataFrame({'ID': user['id'], 'ФИО': user.get('name', {}),
+                                           'Дата рождения': user.get('birthday', {}),
+                                           'Электронная почта': user.get('email', {}),
+                                           'Номер телефона': user.get('phone', {}),
                                            'Место работы': user.get('employment', {}).get('company', None),
                                            'Должность': user.get('employment', {}).get('position', None),
                                            'Роль': user.get('roleName', {}),
-                                           'Город проживания': city, 'Регион': region, 'Статус': user.get('status', {})},
+                                           'Город проживания': city, 'Регион': region,
+                                           'Статус': user.get('status', {})},
                                           index=[event])
                     all_data = pd.concat([all_data, export])
                 except Exception:
@@ -423,11 +462,57 @@ def main():
                                     '5 — получить данные профиля\n'
                                     '6 — получить данные участников мероприятия(-ий)\n')
             if function_choice == '1':
+                export_info = input('Готовимся выгрузить информацию о мероприятиях.'
+                                    '\n1 — у меня есть ID нужных мероприятий'
+                                    '\n2 — нужно произвести поиск мероприятий'
+                                    '\n')
                 function_name = 'events info'
-                events = input('Введите ID мероприятий через запятую: ').split(', ')
-                saving_event_info = SavingEventInfo(function_name, events)
-                saving_event_info.save_json_to_excel(function_name, events)
-                print(Fore.GREEN + 'Файл сохранён в корневую папку')
+                if export_info == '1':
+                    events = input('Введите ID мероприятий через запятую: ').split(', ')
+                    saving_event_info = SavingEventInfo(function_name, events)
+                    saving_event_info.save_event_info(function_name, events)
+                    print(Fore.GREEN + 'Файл сохранён в корневую папку')
+                if export_info == '2':
+                    event_name = ''
+                    date_start = ''
+                    date_end = ''
+                    place = ''
+                    moderation = ''
+                    while True:
+                        filters = input('Выберите фильтры, по которым будем искать:'
+                                        '\n1 — название мероприятия;'
+                                        '\n2 — дата начала и дата завершения;\n3 — место проведения;'
+                                        '\n4 — статус модерации'
+                                        '\n')
+                        if filters == '1':
+                            event_name = input('Введите название мероприятия: ')
+                        if filters == '2':
+                            date_start = input('Введите дату начала мероприятий в формате 2020-01-31 (ГГГГ-ММ-ДД): ')
+                            date_end = input('Введите дату завершения мероприятий в формате 2020-01-31 (ГГГГ-ММ-ДД): ')
+                        if filters == '3':
+                            place = input('Введите площадку проведения мероприятий: ')
+                        if filters == '4':
+                            moderation_choice = input('Выберите статус модерации мероприятия:'
+                                                      '\n1 — на модерации;'
+                                                      '\n2 — одобрено;'
+                                                      '\n3 — отклонено'
+                                                      '\n')
+                            if moderation_choice == '1':
+                                moderation = 'wait'
+                            if moderation_choice == '2':
+                                moderation = 'approved'
+                            if moderation_choice == '3':
+                                moderation = 'declined'
+                        continue_choose_filters = input('Нужно добавить ещё фильтры?\n1 — да;'
+                                                        '\n2 — нет'
+                                                        '\n')
+                        if continue_choose_filters == '2':
+                            break
+                    getting_info = GetInfo()
+                    events = getting_info.search_events(event_name, date_start, date_end, place, moderation)
+                    saving_event_info = SavingEventInfo(function_name, events)
+                    saving_event_info.save_event_info(function_name, events)
+                    print(Fore.GREEN + 'Файл сохранён в корневую папку')
 
             elif function_choice == '2':
                 orgs_id_ = input('Введите ID организаторов через запятую: ').split(', ')
@@ -441,7 +526,7 @@ def main():
                     print('У пользователя нет созданных мероприятий.')
                 else:
                     saving_event_info = SavingEventInfo(function_name, org_events)
-                    saving_event_info.save_json_to_excel(function_name, org_events)
+                    saving_event_info.save_event_info(function_name, org_events)
                     print(Fore.GREEN + 'Файл сохранён в корневую папку')
 
             elif function_choice == '3':
@@ -452,7 +537,7 @@ def main():
                     print('У пользователя нет посещённых мероприятий.')
                 else:
                     saving_event_info = SavingEventInfo(function_name, user_events)
-                    saving_event_info.save_json_to_excel(function_name, user_events)
+                    saving_event_info.save_event_info(function_name, user_events)
                     print(Fore.GREEN + 'Файл сохранён в корневую папку')
             elif function_choice == '4':
                 company_id_ = int(input('Введите ID организации: '))
@@ -463,7 +548,7 @@ def main():
                     print('У организации нет мероприятий.')
                 else:
                     saving_event_info = SavingEventInfo(function_name, company_events)
-                    saving_event_info.save_json_to_excel(function_name, company_events)
+                    saving_event_info.save_event_info(function_name, company_events)
                     print(Fore.GREEN + 'Файл сохранён в корневую папку')
             elif function_choice == '5':
                 authorization = Auth()
@@ -507,13 +592,16 @@ def main():
                     print()
                     ip = authorization.get_ip()
                     authorization.send_success_email(name, token, ip)
-                function_name = 'participants export'
+
                 getting_info = GetInfo()
                 events_id = input('Введите ID мероприятий через запятую: ').split(', ')
+                if len(events_id) > 1:
+                    function_name = 'participants export'
+                else:
+                    function_name = f'participants {events_id} export'
                 data = getting_info.get_participants(events_id)
                 saving_users_info = SavingUsersInfo(function_name, data)
                 saving_users_info.save_participants_info(function_name, data)
-
 
         except Exception:
             print(Fore.RED + 'Ошибка.')

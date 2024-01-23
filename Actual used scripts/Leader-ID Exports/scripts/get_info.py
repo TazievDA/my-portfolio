@@ -1,13 +1,13 @@
 from . import authorization as auth
 import requests
+import time
 
 class GetInfo:
 
     @staticmethod
-    def search_events(event_name, date_start, date_end, place, moderation):
-        token = auth.Auth.get_api_key()
+    def search_events(event_name, token, date_start, date_end, place, moderation):
         url = 'https://admin.leader-id.ru/api/v4/admin/events/search'
-        headers = {'Authorization': f'Bearer {token}'}
+        headers = {'Authorization': f'{token}'}
         params = {'paginationSize': 10000}
         if event_name != '':
             q = {'query': event_name}
@@ -36,9 +36,8 @@ class GetInfo:
             print('Мероприятия не найдены.')
 
     @staticmethod
-    def get_event_info(eventsId):
-        token = auth.Auth.get_api_key()
-        headers = {'Authorization': f'Bearer {token}'}
+    def get_event_info(eventsId, token):
+        headers = {'Authorization': f'{token}'}
         responses = []
         for id_ in eventsId:
             url = f'https://leader-id.ru/api/v4/admin/events/{id_}'
@@ -51,9 +50,8 @@ class GetInfo:
         return responses
 
     @staticmethod
-    def get_tk_info(tk_id):
-        token = auth.Auth.get_api_key()
-        headers = {'Authorization': f'Bearer {token}'}
+    def get_tk_info(tk_id, token):
+        headers = {'Authorization': f'{token}'}
         try:
             url = f'https://leader-id.ru/api/v4/admin/spaces/{tk_id}'
             response = requests.get(url, headers=headers)
@@ -63,9 +61,8 @@ class GetInfo:
             return f'{tk_id}'
 
     @staticmethod
-    def get_theme_name(theme):
-        token = auth.Auth.get_api_key()
-        headers = {'Authorization': f'Bearer {token}'}
+    def get_theme_name(theme, token):
+        headers = {'Authorization': f'{token}'}
         try:
             url = f'https://leader-id.ru/api/v4/admin/themes/{theme}'
             response = requests.get(url, headers=headers)
@@ -75,12 +72,12 @@ class GetInfo:
             return f'{theme}'
 
     @staticmethod
-    def get_orgs_events(orgs_id):
+    def get_orgs_events(orgs_id, token):
         events_list = []
         for org_id in orgs_id:
-            token = auth.Auth.get_owner_token(org_id)
+            api_key = auth.Auth.get_owner_token(org_id, token)
             api_url = 'https://leader-id.ru/api/v4/owner/events'
-            headers = {'Authorization': f'Bearer {token}'}
+            headers = {'Authorization': f'Bearer {api_key}'}
             params = {'fields': 'id', 'paginationSize': '1000'}
             response = requests.get(api_url, headers=headers, params=params)
             events_id = response.json()['data']['_items']
@@ -89,10 +86,9 @@ class GetInfo:
         return events_list
 
     @staticmethod
-    def get_users_events(userId):
-        api_key = auth.Auth.get_api_key()
+    def get_users_events(userId, token):
         params = {'userId': userId, 'paginationSize': '1000'}
-        headers = {'Authorization': f'Bearer {api_key}'}
+        headers = {'Authorization': f'{token}'}
         api_url = 'https://leader-id.ru/api/v4/admin/event-participants/history'
         response = requests.get(api_url, params=params, headers=headers)
         data = response.json()['data']['_items']
@@ -113,17 +109,16 @@ class GetInfo:
         return events_id
 
     @staticmethod
-    def get_user_info(users_id):
-        token = auth.Auth.get_api_key()
+    def get_user_info(users_id, token):
         data = []
-        headers = {'Authorization': f'Bearer {token}'}
+        headers = {'Authorization': f'{token}'}
         for user in users_id:
             url = f'https://leader-id.ru/api/v4/admin/users/{user}'
             response = requests.get(url, headers=headers)
             lst = response.json().get('data', {})
             print(f'Получаю информацию о пользователе {lst.get("name", {})}')
             data.append(lst)
-            sleep(0.5)
+            time.sleep(0.5)
         return data
 
     @staticmethod
@@ -137,9 +132,8 @@ class GetInfo:
         return region
 
     @staticmethod
-    def get_participants(events_id):
-        token = auth.Auth.get_api_key()
-        headers = {'Authorization': f'Bearer {token}'}
+    def get_participants(events_id, token):
+        headers = {'Authorization': f'{token}'}
         url = 'https://leader-id.ru/api/v4/admin/event-participants/search'
         users_id = []
         for event in events_id:

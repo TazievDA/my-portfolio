@@ -9,8 +9,8 @@ class SavingEventInfo:
         self.function = function
         self.eventsId = eventsId
 
-    def save_event_info(self, function, eventsId):
-        data = get_info.GetInfo.get_event_info(eventsId)
+    def save_event_info(self, function, eventsId, token):
+        data = get_info.GetInfo.get_event_info(eventsId, token)
         date = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
 
         writer = pd.ExcelWriter(f'{function} {date}.xlsx', engine='xlsxwriter')
@@ -41,7 +41,7 @@ class SavingEventInfo:
                     place = ''
             else:
                 tk_id = event['space']['spaceId']
-                place = get_info.GetInfo.get_tk_info(tk_id)
+                place = get_info.GetInfo.get_tk_info(tk_id, token)
 
             type_of_place = ''
             if event['format'] == 'space':
@@ -70,7 +70,7 @@ class SavingEventInfo:
             themes = []
             event_themes = event['themes']
             for theme in event_themes:
-                theme_name = get_info.GetInfo.get_theme_name(theme)
+                theme_name = get_info.GetInfo.get_theme_name(theme, token)
                 themes.append(theme_name)
                 sleep(0.2)
 

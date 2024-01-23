@@ -1,4 +1,5 @@
 import pandas as pd
+import xlsxwriter
 from . import get_info
 from datetime import datetime
 
@@ -8,8 +9,8 @@ class SavingUsersInfo():
         self.function = function
         self.usersId = usersId
 
-    def save_user_info(self, function, users_id):
-        data = get_info.GetInfo.get_user_info(users_id)
+    def save_user_info(self, function, users_id, token):
+        data = get_info.GetInfo.get_user_info(users_id, token)
         date = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
 
         writer = pd.ExcelWriter(f'{function} {date}.xlsx', engine='xlsxwriter')
@@ -33,7 +34,8 @@ class SavingUsersInfo():
                                        'Место работы': user.get('employment', {}).get('company', None),
                                        'Должность': user.get('employment', {}).get('position', None),
                                        'Роль': user.get('roleName', {}),
-                                       'Город проживания': city, 'Регион': region, 'Статус': user.get('status', {})},
+                                       'Город проживания': city, 'Регион': region, 'Статус': user.get('status', {}),
+                                       'Дата регистрации': user.get('createdAt', {})},
                                       index=[user['id']])
                 all_data = pd.concat([all_data, export])
             except Exception:
@@ -51,14 +53,14 @@ class SavingUsersInfo():
 
         workbook.close()
 
-    def save_participants_info(self, function, datas):
+    def save_participants_info(self, function, datas, token):
         date = datetime.now().strftime('%d-%m-%Y %H-%M-%S')
         all_data = pd.DataFrame()
         writer = pd.ExcelWriter(f'{function} {date}.xlsx', engine='xlsxwriter')
         workbook = writer.book
 
         for event, users_id in datas:
-            data = get_info.GetInfo.get_user_info(users_id)
+            data = get_info.GetInfo.get_user_info(users_id, token)
             for user in data:
                 try:
                     try:

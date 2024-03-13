@@ -3,17 +3,21 @@ from random import randrange
 import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 
-from data_base.insert_database import add_bot_users, Base, engine
-from data_base.select_database import select_all_favorites, check_current_user
-from scripts.add_to_vk_blacklist import add_to_vk_blacklist
-from scripts.keyboard_main import keyboard_main
+from data_base.insert import add_bot_users, engine
+from data_base.models import create_tables
+from data_base.select import select_all_favorites, check_current_user
+
+from scripts.vk import add_to_vk_blacklist
+from scripts.keyboard import keyboard_main
 from scripts.return_message import return_message, return_favorites_list
 from scripts.search_users import search_users
-from scripts.vk_add_to_favorites import add_to_vk_favorites
-from scripts.vk_get_user_info import get_current_user_info
+from scripts.vk import add_to_vk_favorites
+from scripts.vk import get_current_user_info
 
-community_token = input('Community token: ')
-personal_token = input('Personal token: ')
+import os
+
+community_token = os.getenv('Community_token')
+personal_token = os.getenv('Personal_token')
 
 vk = vk_api.VkApi(token=community_token)
 longpoll = VkLongPoll(vk)
@@ -24,8 +28,7 @@ def write_msg(user_id, message):
                                 'keyboard': keyboard_main()})
 
 
-Base.metadata.create_all(engine)
-
+create_tables(engine)
 counter = 0
 
 vk_id = int()

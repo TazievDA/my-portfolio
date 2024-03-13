@@ -1,8 +1,7 @@
 from random import randrange
 
-from scripts.keyboard_main import keyboard_main
-from scripts.keyboard_search import keyboard_search
-from scripts.vk_find_photo import get_photos_links
+from scripts.keyboard import keyboard_main, keyboard_search
+from scripts.vk import get_photos_links
 
 
 def return_message(personal_token, vk, event, counter, current_user_id, search_result, ids):
